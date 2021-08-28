@@ -1,0 +1,32 @@
+{
+  "name": "eris-command-handler",
+  "version": "1.3.6",
+  "description": "This is a Command Handler for eris, it is very similar to the original command client from eris (thats because it is copied, with modifications) but has features that I wanted in a command handler",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/test.js"
+  },
+  "exports": {
+    ".": [
+      {
+        "require": "./index.js",
+        "import": "./esm.mjs"
+      },
+      "./index.js"
+    ],
+    "./": "./",
+    "./esm": "./esm.mjs"
+  },
+  "keywords": [
+    "eris"
+  ],
+  "typings": "./index.d.ts",
+  "author": "AlekEagle",
+  "license": "ISC",
+  "devDependencies": {
+    "dotenv": "^8.2.0"
+  },
+  "dependencies": {
+    "eris": "^0.15.1"
+  }
+}
