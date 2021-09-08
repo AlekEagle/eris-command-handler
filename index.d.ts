@@ -122,7 +122,7 @@ declare namespace ECH {
     restartCooldown?: boolean;
     usage?: string;
     removeWhitespace?: boolean;
-    whitespaceSeperator?: RegExp;
+    whitespaceSeparator?: RegExp;
   }
 
   interface CommandClientOptions {
@@ -135,7 +135,7 @@ declare namespace ECH {
     name?: string;
     owner?: string;
     prefix?: string | string[];
-    whitespaceSeperator?: RegExp;
+    whitespaceSeparator?: RegExp;
   }
 
   interface ActiveMessages {
@@ -151,11 +151,23 @@ declare namespace ECH {
     commands: { [s: string]: Command };
     guildPrefixes: { [s: string]: string | string[] };
     preReady?: true;
-    constructor(token: string, options?: ClientOptions, commandOptions?: CommandClientOptions);
+    constructor(
+      token: string,
+      options?: ClientOptions,
+      commandOptions?: CommandClientOptions
+    );
     checkPrefix(msg: Message): void;
     onMessageCreate(msg: Message): Promise<void>;
-    onMessageReactionEvent(msg: Message, emoji: Emoji, reactor: Member | Uncached | string): Promise<void>;
-    registerCommand(label: string, generator: CommandGenerator, options?: CommandOptions): Command;
+    onMessageReactionEvent(
+      msg: Message,
+      emoji: Emoji,
+      reactor: Member | Uncached | string
+    ): Promise<void>;
+    registerCommand(
+      label: string,
+      generator: CommandGenerator,
+      options?: CommandOptions
+    ): Command;
     registerCommandAlias(alias: string, label: string): void;
     registerGuildPrefix(guildID: string, prefix: string[] | string): void;
     resolveCommand(label: string): Command;
