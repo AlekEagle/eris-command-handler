@@ -1,21 +1,23 @@
-'use strict';
+"use strict";
 
-const Command = require('./Command');
-const { Client, Message } = require('eris');
+const Command = require("./Command");
+const { Client, Message } = require("eris");
 
 /**
  * Represents an Eris client with the command framework
  * @extends Client
- * @prop {Object} commandAliases Object mapping command label aliases to command labels
  * @prop {Object} commands Object mapping command labels to Command objects
- * @prop {Object} guildPrefixes Object mapping guild IDs to arrays of guild-specific prefixes
+ * @prop {Object} commandAliases Object mapping command label aliases to command labels
+ * @prop {Object} commandOptions Command options
+ * @prop {Object} guildPrefixes Object mapping guild IDs to guild specific prefix or arrays of guild-specific prefixes
  */
 class CommandClient extends Client {
   /**
    * Create a CommandClient
-   * @arg {String} token bot token
-   * @arg {Object} [options] Eris options (same as Client)
+   * @arg {String} token Bot token
+   * @arg {Object} options Eris options (same as Client)
    * @arg {Object} [commandOptions] Command options
+   * @arg {Function} [argsSplitter] The function used to split args. The function is given a string with the contents of the command message (without the prefix) and should return an array of strings. By default, args are split by consecutive whitespace
    * @arg {Boolean} [commandOptions.defaultHelpCommand=true] Whether to register the default help command or not
    * @arg {String} [commandOptions.description="An Eris-based Discord bot"] The description to show in the default help command
    * @arg {Boolean} [commandOptions.ignoreBots=true] Whether to ignore bot accounts or not
@@ -30,14 +32,15 @@ class CommandClient extends Client {
     super(token, options);
     this.commandOptions = Object.assign(
       {
+        argsSplitter: (str) => str.split(/\s+/g),
         defaultHelpCommand: true,
-        description: 'An Eris-based Discord bot',
+        description: "An Eris-based Discord bot",
         ignoreBots: true,
         ignoreSelf: true,
         name: null,
-        owner: 'an unknown user',
-        prefix: '@mention ',
-        defaultCommandOptions: {}
+        owner: "an unknown user",
+        prefix: "@mention ",
+        defaultCommandOptions: {},
       },
       commandOptions
     );
@@ -46,7 +49,7 @@ class CommandClient extends Client {
     this.commandAliases = {};
     this.activeMessages = {};
 
-    this.once('shardPreReady', () => {
+    this.once("shardPreReady", () => {
       this.preReady = true;
       if (!this.commandOptions.name) {
         this.commandOptions.name = `**${this.user.username}**`;
@@ -81,36 +84,36 @@ class CommandClient extends Client {
       }
     });
 
-    this.on('messageCreate', this.onMessageCreate);
+    this.on("messageCreate", this.onMessageCreate);
 
-    this.on('messageReactionAdd', this.onMessageReactionEvent);
-    this.on('messageReactionRemove', this.onMessageReactionEvent);
+    this.on("messageReactionAdd", this.onMessageReactionEvent);
+    this.on("messageReactionRemove", this.onMessageReactionEvent);
 
     if (this.commandOptions.defaultHelpCommand) {
       this.registerCommand(
-        'help',
+        "help",
         (msg, args) => {
-          let result = '';
+          let result = "";
           if (args.length > 0) {
             let cur = this.commands[this.commandAliases[args[0]] || args[0]];
             if (!cur) {
-              return 'Command not found';
+              return "Command not found";
             }
             let { label } = cur;
             for (let i = 1; i < args.length; ++i) {
               cur = cur.subcommands[cur.subcommandAliases[args[i]] || args[i]];
               if (!cur) {
-                return 'Command not found';
+                return "Command not found";
               }
               label += ` ${cur.label}`;
             }
             result += `**${msg.prefix}${label}** ${cur.usage}\n${cur.fullDescription}`;
             if (cur.aliases.length > 0) {
-              result += `\n\n**Aliases:** ${cur.aliases.join(', ')}`;
+              result += `\n\n**Aliases:** ${cur.aliases.join(", ")}`;
             }
             const subcommands = Object.keys(cur.subcommands);
             if (subcommands.length > 0) {
-              result += '\n\n**Subcommands:**';
+              result += "\n\n**Subcommands:**";
               for (const subLabel of subcommands) {
                 if (
                   cur.subcommands.hasOwnProperty(subLabel) &&
@@ -125,7 +128,7 @@ class CommandClient extends Client {
             if (this.commandOptions.owner) {
               result += `by ${this.commandOptions.owner}\n`;
             }
-            result += '\n**Commands:**\n';
+            result += "\n**Commands:**\n";
             for (const label in this.commands) {
               if (
                 this.commands.hasOwnProperty(label) &&
@@ -141,19 +144,37 @@ class CommandClient extends Client {
           return result;
         },
         {
-          description: 'This help text',
+          description: "This help text",
           fullDescription:
-            'This command is used to view information of different bot commands, including this one.'
+            "This command is used to view information of different bot commands, including this one.",
         }
       );
       if (!this.commandOptions.defaultCommandOptions.invalidUsageMessage) {
         this.commandOptions.defaultCommandOptions.invalidUsageMessage =
-          'Invalid usage. Do `%prefix%help %label%` to view proper usage.';
+          "Invalid usage. Do `%prefix%help %label%` to view proper usage.";
       }
     } else if (!this.commandOptions.defaultCommandOptions.invalidUsageMessage) {
       this.commandOptions.defaultCommandOptions.invalidUsageMessage =
-        'Invalid usage.';
+        "Invalid usage.";
     }
+  }
+
+  checkPrefix(msg) {
+    let prefixes = this.commandOptions.prefix;
+    if (
+      msg.channel.guild !== undefined &&
+      this.guildPrefixes[msg.channel.guild.id] !== undefined
+    ) {
+      prefixes = this.guildPrefixes[msg.channel.guild.id];
+    }
+    if (typeof prefixes === "string") {
+      return msg.content.replace(/<@!/g, "<@").startsWith(prefixes) && prefixes;
+    } else if (Array.isArray(prefixes)) {
+      return prefixes.find((prefix) =>
+        msg.content.replace(/<@!/g, "<@").startsWith(prefix)
+      );
+    }
+    throw new Error(`Unsupported prefix format | ${prefixes}`);
   }
 
   /**
@@ -166,7 +187,7 @@ class CommandClient extends Client {
     }
     if (!msg.author) {
       this.emit(
-        'warn',
+        "warn",
         `Message ${msg.id} has author=${msg.author} | Channel ${
           msg.channel.id
         }, timestamp ${Date.now()}`
@@ -180,16 +201,15 @@ class CommandClient extends Client {
       (!this.commandOptions.ignoreBots || !msg.author.bot) &&
       (msg.prefix = this.checkPrefix(msg))
     ) {
-      let args = msg.content
-        .replace(/<@!/g, '<@')
-        .substring(msg.prefix.length)
-        .split(/\s/g);
+      const args = this.commandOptions.argsSplitter(
+        msg.content.replace(/<@!/g, "<@").substring(msg.prefix.length).trim()
+      );
       const label = args.shift();
       const command = this.resolveCommand(label);
       if (command !== undefined) {
         msg.command = command;
         args = msg.content
-          .replace(/<@!/g, '<@')
+          .replace(/<@!/g, "<@")
           .substring(msg.prefix.length)
           .split(
             msg.command.whitespaceSeparator
@@ -199,22 +219,22 @@ class CommandClient extends Client {
         args.shift();
         if (msg.command.removeWhitespace)
           args = args.filter(
-            a =>
+            (a) =>
               a.replace(
                 msg.command.whitespaceSeparator
                   ? msg.command.whitespaceSeparator
                   : /\s/g,
-                ''
+                ""
               ).length !== 0
           );
         try {
           let resp = await msg.command.process(args, msg);
           if (resp != null) {
             if (!(resp instanceof Message)) {
-              resp = await this.createMessage(msg.channel.id, resp);
+              resp = await this.createMessage(msg.channel.id, resp); // eslint-disable-line require-atomic-updates
             }
             if (msg.command.reactionButtons) {
-              msg.command.reactionButtons.forEach(button =>
+              msg.command.reactionButtons.forEach((button) =>
                 resp.addReaction(button.emoji)
               );
               this.activeMessages[resp.id] = {
@@ -222,7 +242,7 @@ class CommandClient extends Client {
                 command: msg.command,
                 timeout: setTimeout(() => {
                   this.unwatchMessage(resp.id, resp.channel.id);
-                }, msg.command.reactionButtonTimeout)
+                }, msg.command.reactionButtonTimeout),
               };
             }
           }
@@ -230,22 +250,26 @@ class CommandClient extends Client {
             msg.command.hooks.postCommand(msg, args, resp);
           }
         } catch (err) {
-          this.emit('error', err);
+          this.emit("error", err);
           if (msg.command.hooks.postExecution) {
             msg.command.hooks.postExecution(msg, args, false);
           }
           let newMsg;
           if (msg.command.errorMessage) {
-            if (typeof msg.command.errorMessage === 'function') {
-              const reply = msg.command.errorMessage();
-              if (reply !== undefined) {
-                newMsg = await this.createMessage(msg.channel.id, reply);
+            try {
+              if (typeof msg.command.errorMessage === "function") {
+                const reply = await msg.command.errorMessage(msg, err);
+                if (reply !== undefined) {
+                  newMsg = await this.createMessage(msg.channel.id, reply);
+                }
+              } else {
+                newMsg = await this.createMessage(
+                  msg.channel.id,
+                  msg.command.errorMessage
+                );
               }
-            } else {
-              newMsg = await this.createMessage(
-                msg.channel.id,
-                msg.command.errorMessage
-              );
+            } catch (err) {
+              this.emit("error", err);
             }
           }
           if (msg.command.hooks.postCommand) {
@@ -256,21 +280,8 @@ class CommandClient extends Client {
     }
   }
 
-  resolveCommand(label) {
-    label = this.commandAliases[label] || label;
-    let command = this.commands[label];
-    if (command) {
-      return command;
-    }
-    label = label.toLowerCase();
-    label = this.commandAliases[label] || label;
-    command = this.commands[label];
-    if (command && command.caseInsensitive) {
-      return command;
-    }
-  }
-
-  async onMessageReactionEvent(msg, emoji, userID) {
+  async onMessageReactionEvent(msg, emoji, reactor) {
+    const userID = typeof reactor === "object" ? reactor.id : reactor;
     if (
       !this.ready ||
       userID === this.user.id ||
@@ -284,7 +295,7 @@ class CommandClient extends Client {
     const activeMessage = this.activeMessages[msg.id];
     if (activeMessage && activeMessage.command.reactionButtons) {
       const action = activeMessage.command.reactionButtons.find(
-        button => button.emoji === emoji
+        (button) => button.emoji === emoji
       );
       if (!action) {
         return;
@@ -295,7 +306,7 @@ class CommandClient extends Client {
       }
 
       switch (action.type) {
-        case 'cancel': {
+        case "cancel": {
           this.unwatchMessage(msg.id, msg.channel.guild && msg.channel.id);
           try {
             const resp = await action.execute(msg, activeMessage.args, userID);
@@ -305,7 +316,7 @@ class CommandClient extends Client {
           } catch (err) {} // eslint-disable-line no-empty
           break;
         }
-        case 'edit':
+        case "edit":
         default: {
           try {
             const resp = await action.execute(msg, activeMessage.args, userID);
@@ -317,70 +328,6 @@ class CommandClient extends Client {
         }
       }
     }
-  }
-
-  /**
-   * Register a prefix override for a specific guild
-   * @arg {String} guildID The ID of the guild to override prefixes for
-   * @arg {String | Array} prefix The bot prefix. Can be either an array of prefixes or a single prefix. "@mention" will be automatically replaced with the bot's actual mention
-   */
-  registerGuildPrefix(guildID, prefix) {
-    if (!this.preReady) {
-      this.guildPrefixes[guildID] = prefix;
-    } else if (Array.isArray(prefix)) {
-      for (let i = 0; i < prefix.length; ++i) {
-        prefix[i] = prefix[i].replace(/@mention/g, this.user.mention);
-      }
-      this.guildPrefixes[guildID] = prefix;
-    } else {
-      this.guildPrefixes[guildID] = prefix.replace(
-        /@mention/g,
-        this.user.mention
-      );
-    }
-  }
-
-  checkPrefix(msg) {
-    let prefixes = this.commandOptions.prefix;
-    if (
-      msg.channel.guild !== undefined &&
-      this.guildPrefixes[msg.channel.guild.id] !== undefined
-    ) {
-      prefixes = this.guildPrefixes[msg.channel.guild.id];
-    }
-    if (typeof prefixes === 'string') {
-      return msg.content.replace(/<@!/g, '<@').startsWith(prefixes) && prefixes;
-    } else if (Array.isArray(prefixes)) {
-      return prefixes.find(prefix =>
-        msg.content.replace(/<@!/g, '<@').startsWith(prefix)
-      );
-    }
-    throw new Error(`Unsupported prefix format | ${prefixes}`);
-  }
-
-  /**
-   * Register an alias for a command
-   * @arg {String} alias The alias
-   * @arg {String} label The original command label
-   */
-  registerCommandAlias(alias, label) {
-    let caseInsensitiveLabel = false;
-    if (
-      !this.commands[label] &&
-      !(
-        this.commands[(label = label.toLowerCase())] &&
-        (caseInsensitiveLabel =
-          this.commands[label.toLowerCase()].caseInsensitive)
-      )
-    ) {
-      throw new Error(`No command registered for ${label}`);
-    }
-    alias = caseInsensitiveLabel === true ? alias.toLowerCase() : alias;
-    if (this.commandAliases[alias]) {
-      throw new Error(`Alias ${alias} already registered`);
-    }
-    this.commandAliases[alias] = label;
-    this.commands[label].aliases.push(alias);
   }
 
   /**
@@ -399,12 +346,12 @@ class CommandClient extends Client {
    * @arg {Array<String>} [options.cooldownExclusions.guildIDs] An array of guild IDs representing guilds that are not affected by cooldowns.
    * @arg {Array<String>} [options.cooldownExclusions.channelIDs] An array of channel IDs representing channels that are not affected by cooldowns.
    * @arg {Function | String} [options.cooldownMessage] A string or a function that returns a string to show when the command is on cooldown
-   * @arg {Number} [options.cooldownReturns=0] Number of times to return a message when the command is used during it's cooldown.  Once the cooldown expires this is reset.  Set this to 0 to always return a message.
+   * @arg {Number} [option.cooldownReturns=0] Number of times to return a message when the command is used during it's cooldown.  Once the cooldown expires this is reset.  Set this to 0 to always return a message.
    * @arg {Object} [options.defaultSubcommandOptions={}] Default subcommand options. This object takes the same options as a normal Command
    * @arg {Boolean} [options.deleteCommand=false] Whether to delete the user command message or not
    * @arg {String} [options.description="No description"] A short description of the command to show in the default help command
    * @arg {Boolean} [options.dmOnly=false] Whether to prevent the command from being used in guilds or not
-   * @arg {Function | String} [options.errorMessage] A string or a function that returns a string to show if the execution of the command handler somehow fails.
+   * @arg {Function | String} [options.errorMessage] A string or a function that returns a string to show if the execution of the command handler somehow fails. The function is passed the command message and the error as parameters.
    * @arg {String} [options.fullDescription="No full description"] A detailed description of the command to show in the default help command
    * @arg {Boolean} [options.guildOnly=false] Whether to prevent the command from being used in Direct Messages or not
    * @arg {Boolean} [options.hidden=false] Whether or not the command should be hidden from the default help command list
@@ -437,12 +384,11 @@ class CommandClient extends Client {
    * @arg {Function} [options.requirements.custom] A function that accepts a message and returns true if the command should be run
    * @arg {Boolean} [option.restartCooldown=false] Whether or not to restart a command's cooldown every time it's used.
    * @arg {String} [options.usage] Details on how to call the command to show in the default help command
-   * @arg {Boolean} [options.removeWhitespace=true] Determines if empty args should be removed from the args.
    * @returns {Command}
    */
   registerCommand(label, generator, options = {}) {
-    if (label.includes(' ')) {
-      throw new Error('Command label may not have spaces');
+    if (label.includes(" ")) {
+      throw new Error("Command label may not have spaces");
     }
     let lowercaseCommand = label.toLowerCase();
     if (
@@ -482,7 +428,7 @@ class CommandClient extends Client {
       throw new Error(`Alias ${command} already registered`);
     }
     if (options.aliases) {
-      options.aliases.forEach(alias => {
+      options.aliases.forEach((alias) => {
         lowercaseCommand = alias.toLowerCase();
         if (
           this.commands[alias] ||
@@ -520,6 +466,66 @@ class CommandClient extends Client {
   }
 
   /**
+   * Register an alias for a command
+   * @arg {String} alias The alias
+   * @arg {String} label The original command label
+   */
+  registerCommandAlias(alias, label) {
+    let caseInsensitiveLabel = false;
+    if (
+      !this.commands[label] &&
+      !(
+        this.commands[(label = label.toLowerCase())] &&
+        (caseInsensitiveLabel =
+          this.commands[label.toLowerCase()].caseInsensitive)
+      )
+    ) {
+      throw new Error(`No command registered for ${label}`);
+    }
+    alias = caseInsensitiveLabel === true ? alias.toLowerCase() : alias;
+    if (this.commandAliases[alias]) {
+      throw new Error(`Alias ${alias} already registered`);
+    }
+    this.commandAliases[alias] = label;
+    this.commands[label].aliases.push(alias);
+  }
+
+  /**
+   * Register a prefix override for a specific guild
+   * @arg {String} guildID The ID of the guild to override prefixes for
+   * @arg {String | Array} prefix The bot prefix. Can be either an array of prefixes or a single prefix. "@mention" will be automatically replaced with the bot's actual mention
+   */
+  registerGuildPrefix(guildID, prefix) {
+    if (!this.preReady) {
+      this.guildPrefixes[guildID] = prefix;
+    } else if (Array.isArray(prefix)) {
+      for (let i = 0; i < prefix.length; ++i) {
+        prefix[i] = prefix[i].replace(/@mention/g, this.user.mention);
+      }
+      this.guildPrefixes[guildID] = prefix;
+    } else {
+      this.guildPrefixes[guildID] = prefix.replace(
+        /@mention/g,
+        this.user.mention
+      );
+    }
+  }
+
+  resolveCommand(label) {
+    label = this.commandAliases[label] || label;
+    let command = this.commands[label];
+    if (command) {
+      return command;
+    }
+    label = label.toLowerCase();
+    label = this.commandAliases[label] || label;
+    command = this.commands[label];
+    if (command && command.caseInsensitive) {
+      return command;
+    }
+  }
+
+  /**
    * Unregister a command
    * @arg {String} label The command label
    */
@@ -541,6 +547,21 @@ class CommandClient extends Client {
     if (channelID) {
       this.removeMessageReactions(channelID, id).catch(() => {});
     }
+  }
+
+  toString() {
+    return `[CommandClient ${this.user.id}]`;
+  }
+
+  toJSON(props = []) {
+    return super.toJSON([
+      "commandOptions",
+      "guildPrefixes",
+      "commands",
+      "commandAliases",
+      "activeMessages",
+      ...props,
+    ]);
   }
 }
 
