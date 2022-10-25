@@ -201,7 +201,7 @@ class CommandClient extends Client {
       (!this.commandOptions.ignoreBots || !msg.author.bot) &&
       (msg.prefix = this.checkPrefix(msg))
     ) {
-      const args = this.commandOptions.argsSplitter(
+      let args = this.commandOptions.argsSplitter(
         msg.content.replace(/<@!/g, "<@").substring(msg.prefix.length).trim()
       );
       const label = args.shift();
