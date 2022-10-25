@@ -14,7 +14,6 @@
       },
       "./index.js"
     ],
-    "./": "./",
     "./esm": "./esm.mjs"
   },
   "keywords": [
@@ -27,6 +26,6 @@
     "dotenv": "^8.2.0"
   },
   "dependencies": {
-    "eris": "^0.16.1"
+    "eris": "^0.17.1"
   }
 }
